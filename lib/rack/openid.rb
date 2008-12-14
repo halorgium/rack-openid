@@ -9,22 +9,6 @@ require 'openid/store/memory'
 
 module Rack
   class OpenID
-    class InvalidOpenId < StandardError
-    end
-
-    def self.normalize_identifier(url)
-      uri = URI.parse(url.to_s.strip)
-      uri = URI.parse("http://#{uri}") unless uri.scheme
-      uri.scheme = uri.scheme.downcase
-      uri.normalize.to_s
-    rescue URI::InvalidURIError
-      raise InvalidOpenId.new("#{url} is not an OpenID identifier")
-    end
-
-    def self.normalize_url(url)
-      normalize_identifier(url)
-    end
-
     class TimeoutResponse
       include ::OpenID::Consumer::Response
       STATUS = :failure
@@ -34,11 +18,6 @@ module Rack
       include ::OpenID::Consumer::Response
       STATUS = :missing
     end
-
-    class InvalidResponse
-      include ::OpenID::Consumer::Response
-      STATUS = :invalid
-   end
 
     HTTP_METHODS = %w(GET HEAD PUT POST DELETE OPTIONS)
 
@@ -77,15 +56,6 @@ module Rack
         identifier = params["identifier"]
 
         begin
-          identifier = self.class.normalize_identifier(identifier)
-        rescue InvalidOpenId => e
-          env[IDENTITY]   = identifier
-          env[IDENTIFIER] = identifier
-          env[RESPONSE]   = InvalidResponse.new
-          return self.call(env)
-        end
-
-        begin
           oidreq = consumer.begin(identifier)
           add_simple_registration_fields(oidreq, params)
           url = open_id_redirect_url(req, oidreq, params["return_to"], params["method"])
@@ -108,10 +78,8 @@ module Rack
         }
 
         env[RESPONSE] = oidresp
-        env[IDENTITY] =
-          self.class.normalize_identifier(oidresp.identity_url)
-        env[IDENTIFIER] =
-          self.class.normalize_identifier(oidresp.display_identifier)
+        env[IDENTITY] = oidresp.identity_url
+        env[IDENTIFIER] = oidresp.display_identifier
 
         if method = req.GET["_method"]
           method = method.upcase
