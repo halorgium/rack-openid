@@ -36,7 +36,7 @@ class OpenIDTest < Test::Unit::TestCase
   private
     def app_needs_authentication(qs)
       app = lambda { |env|
-        if resp = env["rack.auth.openid.response"]
+        if resp = env[Rack::OpenID::RESPONSE]
           [400, {}, [resp.status.to_s]]
         else
           [401, {"X-OpenID-Authenticate" => qs}, []]

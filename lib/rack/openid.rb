@@ -21,9 +21,7 @@ module Rack
 
     HTTP_METHODS = %w(GET HEAD PUT POST DELETE OPTIONS)
 
-    RESPONSE = "rack.auth.openid.response".freeze
-    IDENTITY = "rack.auth.openid.identity".freeze
-    IDENTIFIER = "rack.auth.openid.identifier".freeze
+    RESPONSE = "rack.openid.response".freeze
 
     def initialize(app, store = nil)
       @app = app
@@ -64,9 +62,7 @@ module Rack
           url = open_id_redirect_url(req, oidreq, params["return_to"], params["method"])
           return redirect_to(url)
         rescue ::OpenID::OpenIDError, Timeout::Error => e
-          env[IDENTITY]   = identifier
-          env[IDENTIFIER] = identifier
-          env[RESPONSE]   = MissingResponse.new
+          env[RESPONSE] = MissingResponse.new
           return self.call(env)
         end
       end
@@ -84,8 +80,6 @@ module Rack
         }
 
         env[RESPONSE] = oidresp
-        env[IDENTITY] = oidresp.identity_url
-        env[IDENTIFIER] = oidresp.display_identifier
 
         if method = req.GET["_method"]
           method = method.upcase

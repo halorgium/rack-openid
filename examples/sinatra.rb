@@ -15,7 +15,7 @@ get '/login' do
 end
 
 post '/login' do
-  if resp = request.env["rack.auth.openid.response"]
+  if resp = request.env["rack.openid.response"]
     if resp.status == :success
       "Welcome: #{resp.display_identifier}"
     else
