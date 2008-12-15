@@ -51,7 +51,10 @@ module Rack
         req = Rack::Request.new(env)
         params = Rack::Utils.parse_query(qs)
 
-        session = env["rack.session"]
+        unless session = env["rack.session"]
+          raise RuntimeError, "Rack::OpenID requires a session"
+        end
+
         consumer = ::OpenID::Consumer.new(session, @store)
         identifier = params["identifier"]
 
@@ -70,7 +73,10 @@ module Rack
 
       def complete_authentication(env)
         req = Rack::Request.new(env)
-        session = env["rack.session"]
+
+        unless session = env["rack.session"]
+          raise RuntimeError, "Rack::OpenID requires a session"
+        end
 
         oidresp = timeout_protection_from_identity_server {
           consumer = ::OpenID::Consumer.new(session, @store)
