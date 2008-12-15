@@ -87,7 +87,7 @@ module Rack
         begin
           oidreq = consumer.begin(identifier)
           add_simple_registration_fields(oidreq, params)
-          url = open_id_redirect_url(req, oidreq, params["return_to"], params["method"])
+          url = open_id_redirect_url(req, oidreq, params["trust_root"], params["return_to"], params["method"])
           return redirect_to(url)
         rescue ::OpenID::OpenIDError, Timeout::Error => e
           env[RESPONSE] = MissingResponse.new
@@ -155,7 +155,7 @@ module Rack
         [303, {"Content-Type" => "text/html", "Location" => url}, []]
       end
 
-      def open_id_redirect_url(req, oidreq, return_to = nil, method = nil)
+      def open_id_redirect_url(req, oidreq, trust_root = nil, return_to = nil, method = nil)
         if return_to
           method ||= "get"
         else
@@ -165,7 +165,7 @@ module Rack
 
         method = method.to_s.downcase
         oidreq.return_to_args['_method'] = method unless method == "get"
-        oidreq.redirect_url(realm_url(req), return_to)
+        oidreq.redirect_url(trust_root || realm_url(req), return_to || request_url(req))
       end
 
       def add_simple_registration_fields(oidreq, fields)
