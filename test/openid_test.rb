@@ -123,10 +123,6 @@ class BeginAuthenticationTest < Test::Unit::TestCase
           [401, {"X-OpenID-Authenticate" => qs}, []]
         end
       }
-      wrap_app(app)
-    end
-
-    def wrap_app(app)
       Rack::Session::Pool.new(Rack::OpenID.new(app))
     end
 
@@ -160,6 +156,48 @@ class BeginAuthenticationTest < Test::Unit::TestCase
         options[:request].call(request) if options[:request]
         consumer.expects(:begin).returns(request)
       end
+
+      consumer
+    end
+end
+
+class CompleteAuthenicationTest < Test::Unit::TestCase
+  def test_successful
+    stub_consumer!
+
+    response = process(app, "/?openid.mode=id_res")
+
+    assert_equal 200, response.status
+    assert_equal "success", response.body
+  end
+
+  private
+    def app
+      app = lambda { |env|
+        if resp = env[Rack::OpenID::RESPONSE]
+          [200, {}, [resp.status.to_s]]
+        else
+          [500, {}, []]
+        end
+      }
+      Rack::Session::Pool.new(Rack::OpenID.new(app))
+    end
+
+    def process(app, *args)
+      env = Rack::MockRequest.env_for(*args)
+      Rack::MockResponse.new(*app.call(env))
+    end
+
+    def stub_consumer!(*args)
+      OpenID::Consumer.expects(:new).returns(mock_consumer(*args))
+    end
+
+    def mock_consumer(options = {})
+      consumer = mock()
+
+      response = mock()
+      response.expects(:status).returns(:success)
+      consumer.expects(:complete).returns(response)
 
       consumer
     end
