@@ -2,31 +2,112 @@ require 'test/unit'
 require 'rack/openid'
 require 'mocha'
 
-class OpenIDTest < Test::Unit::TestCase
-  def test_begin_authentication
-    stub_consumer!
+class BeginAuthenticationTest < Test::Unit::TestCase
+  OpenIDProvider = "http://www.myopenid.com/"
 
-    app = app_needs_authentication "identifier=loudthinking.com"
-    response = process(app, "/")
+  def test_with_get
+    stub_consumer! :request => lambda { |request|
+      request.expects(:redirect_url).returns(OpenIDProvider)
+    }
+
+    app = app("identifier=loudthinking.com")
+    response = process(app, "/", :method => :get)
 
     assert_equal 303, response.status
-    assert_match /www\.myopenid\.com/, response.headers["Location"]
+    assert_equal OpenIDProvider, response.headers["Location"]
   end
 
-  def test_begin_authentication_with_missing_id
+  def test_with_post_method
+    return_to_args = {}
+    stub_consumer! :request => lambda { |request|
+      request.expects(:return_to_args).returns(return_to_args)
+      request.expects(:redirect_url).
+        with('http://example.org', 'http://example.org/').
+        returns(OpenIDProvider)
+    }
+
+    app = app("identifier=loudthinking.com")
+    response = process(app, "/", :method => :post)
+
+    assert_equal 303, response.status
+    assert_equal OpenIDProvider, response.headers["Location"]
+    assert_equal({"_method" => "post"}, return_to_args)
+  end
+
+  def test_with_custom_return_to
+    stub_consumer! :request => lambda { |request|
+      request.expects(:redirect_url).
+        with('http://example.org', '/complete').
+        returns(OpenIDProvider)
+    }
+
+    app = app("identifier=loudthinking.com&return_to=/complete")
+    response = process(app, "/", :method => :get)
+
+    assert_equal 303, response.status
+    assert_equal OpenIDProvider, response.headers["Location"]
+  end
+
+  def test_with_post_method_custom_return_to
+    stub_consumer! :request => lambda { |request|
+      request.expects(:redirect_url).
+        with('http://example.org', '/complete').
+        returns(OpenIDProvider)
+    }
+
+    app = app("identifier=loudthinking.com&return_to=/complete")
+    response = process(app, "/", :method => :post)
+
+    assert_equal 303, response.status
+    assert_equal OpenIDProvider, response.headers["Location"]
+  end
+
+  def test_with_custom_return_method
+    return_to_args = {}
+    stub_consumer! :request => lambda { |request|
+      request.expects(:return_to_args).returns(return_to_args)
+      request.expects(:redirect_url).
+        with('http://example.org', 'http://example.org/').
+        returns(OpenIDProvider)
+    }
+
+    app = app("identifier=loudthinking.com&method=put")
+    response = process(app, "/", :method => :get)
+
+    assert_equal 303, response.status
+    assert_equal OpenIDProvider, response.headers["Location"]
+    assert_equal({"_method" => "put"}, return_to_args)
+  end
+
+  def test_with_simple_registration_fields
+    stub_consumer! :request => lambda { |request|
+      request.expects(:redirect_url).returns(OpenIDProvider)
+    }, :sregreq => lambda { |sreg|
+      sreg.expects(:request_fields).with(["nickname", "email"], true)
+      sreg.expects(:request_fields).with(["fullname"], false)
+    }
+
+    app = app("identifier=loudthinking.com&required=nickname&required=email&optional=fullname")
+    response = process(app, "/", :method => :get)
+
+    assert_equal 303, response.status
+    assert_equal OpenIDProvider, response.headers["Location"]
+  end
+
+  def test_with_missing_id
     stub_consumer! :failure => true
 
-    app = app_needs_authentication "identifier=loudthinking.com"
+    app = app("identifier=loudthinking.com")
     response = process(app, "/")
 
     assert_equal 400, response.status
     assert_equal "missing", response.body
   end
 
-  def test_begin_authentication_with_timeout
+  def test_with_timeout
     stub_consumer! :timeout => true
 
-    app = app_needs_authentication "identifier=loudthinking.com"
+    app = app("identifier=loudthinking.com")
     response = process(app, "/")
 
     assert_equal 400, response.status
@@ -34,7 +115,7 @@ class OpenIDTest < Test::Unit::TestCase
   end
 
   private
-    def app_needs_authentication(qs)
+    def app(qs)
       app = lambda { |env|
         if resp = env[Rack::OpenID::RESPONSE]
           [400, {}, [resp.status.to_s]]
@@ -68,9 +149,15 @@ class OpenIDTest < Test::Unit::TestCase
         consumer.expects(:begin).raises(OpenID::OpenIDError)
       else
         request = mock()
-        request.expects(:add_extension)
-        url = "http://www.myopenid.com/"
-        request.expects(:redirect_url).returns(url)
+        if options[:sregreq]
+          sregreq = mock()
+          options[:sregreq].call(sregreq)
+          OpenID::SReg::Request.expects(:new).returns(sregreq)
+          request.expects(:add_extension).with(sregreq)
+        else
+          request.expects(:add_extension)
+        end
+        options[:request].call(request) if options[:request]
         consumer.expects(:begin).returns(request)
       end
 

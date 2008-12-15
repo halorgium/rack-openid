@@ -128,10 +128,16 @@ module Rack
       end
 
       def open_id_redirect_url(req, oidreq, return_to = nil, method = nil)
-        method ||= req.request_method
+        if return_to
+          method ||= "get"
+        else
+          return_to = request_url(req)
+          method ||= req.request_method
+        end
+
         method = method.to_s.downcase
         oidreq.return_to_args['_method'] = method unless method == "get"
-        oidreq.redirect_url(realm_url(req), return_to || request_url(req))
+        oidreq.redirect_url(realm_url(req), return_to)
       end
 
       def add_simple_registration_fields(oidreq, fields)
