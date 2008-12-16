@@ -9,6 +9,32 @@ require 'openid/store/memory'
 
 module Rack
   class OpenID
+    def self.build_header(params = {})
+      value = 'OpenID '
+      value += params.map { |k, v|
+        if v.is_a?(Array)
+          "#{k}=\"#{v.join(',')}\""
+        else
+          "#{k}=\"#{v}\""
+        end
+      }.join(', ')
+      value
+    end
+
+    def self.parse_header(str)
+      params = {}
+      if str =~ /^OpenID/
+        str = str.gsub(/^OpenID /, '')
+        str.split(', ').each { |e|
+          k, v = e.split('=')
+          v.gsub!(/^\"/, '').gsub!(/\"$/, "")
+          v = v.split(',')
+          params[k] = v.length > 1 ? v : v.first
+        }
+      end
+      params
+    end
+
     class TimeoutResponse
       include ::OpenID::Consumer::Response
       STATUS = :failure
@@ -22,6 +48,8 @@ module Rack
     HTTP_METHODS = %w(GET HEAD PUT POST DELETE OPTIONS)
 
     RESPONSE = "rack.openid.response".freeze
+    AUTHENTICATE_HEADER = "WWW-Authenticate".freeze
+
 
     def initialize(app, store = nil)
       @app = app
@@ -37,7 +65,7 @@ module Rack
 
       status, headers, body = @app.call(env)
 
-      if status.to_i == 401 && (qs = headers["X-OpenID-Authenticate"])
+      if status.to_i == 401 && (qs = headers[AUTHENTICATE_HEADER])
         begin_authentication(env, qs)
       else
         [status, headers, body]
@@ -47,7 +75,7 @@ module Rack
     private
       def begin_authentication(env, qs)
         req = Rack::Request.new(env)
-        params = Rack::Utils.parse_query(qs)
+        params = self.class.parse_header(qs)
 
         unless session = env["rack.session"]
           raise RuntimeError, "Rack::OpenID requires a session"

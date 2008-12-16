@@ -2,6 +2,26 @@ require 'test/unit'
 require 'rack/openid'
 require 'mocha'
 
+class HeaderTest < Test::Unit::TestCase
+  def test_build_header
+    assert_equal 'OpenID identity="http://example.com/"',
+      Rack::OpenID.build_header(:identity => "http://example.com/")
+    assert_equal 'OpenID identity="http://example.com/", return_to="http://example.org/"',
+      Rack::OpenID.build_header(:identity => "http://example.com/", :return_to => "http://example.org/")
+    assert_equal 'OpenID identity="http://example.com/", required="nickname,email"',
+      Rack::OpenID.build_header(:identity => "http://example.com/", :required => ["nickname", "email"])
+  end
+
+  def test_parse_header
+    assert_equal({"identity" => "http://example.com/"},
+      Rack::OpenID.parse_header('OpenID identity="http://example.com/"'))
+    assert_equal({"identity" => "http://example.com/", "return_to" => "http://example.org/"},
+      Rack::OpenID.parse_header('OpenID identity="http://example.com/", return_to="http://example.org/"'))
+    assert_equal({"identity" => "http://example.com/", "required" => ["nickname", "email"]},
+      Rack::OpenID.parse_header('OpenID identity="http://example.com/", required="nickname,email"'))
+  end
+end
+
 class BeginAuthenticationTest < Test::Unit::TestCase
   OpenIDProvider = "http://www.myopenid.com/"
 
@@ -10,7 +30,7 @@ class BeginAuthenticationTest < Test::Unit::TestCase
       request.expects(:redirect_url).returns(OpenIDProvider)
     }
 
-    app = app("identifier=loudthinking.com")
+    app = app(:identifier => "loudthinking.com")
     response = process(app, "/", :method => :get)
 
     assert_equal 303, response.status
@@ -26,7 +46,7 @@ class BeginAuthenticationTest < Test::Unit::TestCase
         returns(OpenIDProvider)
     }
 
-    app = app("identifier=loudthinking.com")
+    app = app(:identifier => "loudthinking.com")
     response = process(app, "/", :method => :post)
 
     assert_equal 303, response.status
@@ -41,7 +61,7 @@ class BeginAuthenticationTest < Test::Unit::TestCase
         returns(OpenIDProvider)
     }
 
-    app = app("identifier=loudthinking.com&return_to=/complete")
+    app = app(:identifier => "loudthinking.com", :return_to => "/complete")
     response = process(app, "/", :method => :get)
 
     assert_equal 303, response.status
@@ -55,7 +75,7 @@ class BeginAuthenticationTest < Test::Unit::TestCase
         returns(OpenIDProvider)
     }
 
-    app = app("identifier=loudthinking.com&return_to=/complete")
+    app = app(:identifier => "loudthinking.com", :return_to => "/complete")
     response = process(app, "/", :method => :post)
 
     assert_equal 303, response.status
@@ -71,7 +91,7 @@ class BeginAuthenticationTest < Test::Unit::TestCase
         returns(OpenIDProvider)
     }
 
-    app = app("identifier=loudthinking.com&method=put")
+    app = app(:identifier => "loudthinking.com", :method => "put")
     response = process(app, "/", :method => :get)
 
     assert_equal 303, response.status
@@ -87,7 +107,8 @@ class BeginAuthenticationTest < Test::Unit::TestCase
       sreg.expects(:request_fields).with(["fullname"], false)
     }
 
-    app = app("identifier=loudthinking.com&required=nickname&required=email&optional=fullname")
+    app = app(:identifier => "loudthinking.com",
+      :required => ["nickname", "email"], :optional => "fullname")
     response = process(app, "/", :method => :get)
 
     assert_equal 303, response.status
@@ -97,7 +118,7 @@ class BeginAuthenticationTest < Test::Unit::TestCase
   def test_with_missing_id
     stub_consumer! :failure => true
 
-    app = app("identifier=loudthinking.com")
+    app = app(:identifier => "loudthinking.com")
     response = process(app, "/")
 
     assert_equal 400, response.status
@@ -107,7 +128,7 @@ class BeginAuthenticationTest < Test::Unit::TestCase
   def test_with_timeout
     stub_consumer! :timeout => true
 
-    app = app("identifier=loudthinking.com")
+    app = app(:identifier => "loudthinking.com")
     response = process(app, "/")
 
     assert_equal 400, response.status
@@ -115,12 +136,12 @@ class BeginAuthenticationTest < Test::Unit::TestCase
   end
 
   private
-    def app(qs)
+    def app(options)
       app = lambda { |env|
         if resp = env[Rack::OpenID::RESPONSE]
           [400, {}, [resp.status.to_s]]
         else
-          [401, {"X-OpenID-Authenticate" => qs}, []]
+          [401, {Rack::OpenID::AUTHENTICATE_HEADER => Rack::OpenID.build_header(options)}, []]
         end
       }
       Rack::Session::Pool.new(Rack::OpenID.new(app))

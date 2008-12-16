@@ -4,7 +4,7 @@ Provides a more HTTPish API around the ruby-openid library.
 
 === Usage
 
-You trigger an OpenID request similar to HTTP authentication. From your app, return a "401 Unauthorized" and a "X-OpenID-Authenticate" header with the identifier you would like to validate.
+You trigger an OpenID request similar to HTTP authentication. From your app, return a "401 Unauthorized" and a "WWW-Authenticate" header with the identifier you would like to validate.
 
 On completition, the OpenID response is automatically verified and assigned to env["rack.openid.response"].
 
@@ -16,7 +16,7 @@ On completition, the OpenID response is automatically verified and assigned to e
       when :failure
         ...
     else
-      [401, {"X-OpenID-Authenticate" => "identifier=example.com"}, []]
+      [401, {"WWW-Authenticate" => 'OpenID identity="http://example.com/"'}, []]
     end
   }
 

@@ -22,7 +22,7 @@ post '/login' do
       "Error: #{resp.status}"
     end
   else
-    header 'X-OpenID-Authenticate' => Rack::Utils.build_query(
+    header 'WWW-Authenticate' => Rack::OpenID.build_header(
       :identifier => params["openid_identifier"]
     )
     throw :halt, [401, 'got openid?']
