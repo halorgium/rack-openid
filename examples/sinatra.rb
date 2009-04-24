@@ -1,14 +1,14 @@
 require 'rubygems'
 require 'sinatra'
 
+# Session needs to be before Rack::OpenID
+use Rack::Session::Cookie
+
 # gem 'rack-openid'
 $: << File.dirname(__FILE__) + "/../lib"
 require 'rack/openid'
 
 use Rack::OpenID
-
-# Session needs to be after Rack::OpenID
-use Rack::Session::Cookie
 
 get '/login' do
   erb :login
@@ -22,7 +22,7 @@ post '/login' do
       "Error: #{resp.status}"
     end
   else
-    header 'WWW-Authenticate' => Rack::OpenID.build_header(
+    headers 'WWW-Authenticate' => Rack::OpenID.build_header(
       :identifier => params["openid_identifier"]
     )
     throw :halt, [401, 'got openid?']
