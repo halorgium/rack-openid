@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'rack'
 
-gem 'ruby-openid', '>=2.1.2'
+gem 'ruby-openid', '>=2.1.6'
 require 'openid'
 require 'openid/consumer'
 require 'openid/extensions/sreg'
