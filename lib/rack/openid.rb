@@ -116,14 +116,13 @@ module Rack
           end
         end
 
-        query_hash = env["rack.request.query_hash"]
+        query_hash = req.GET
         query_hash.delete("_method")
         query_hash.delete_if do |key, value|
           key =~ /^openid\./
         end
 
-        env["QUERY_STRING"] = env["rack.request.query_string"] =
-          Rack::Utils.build_query(env["rack.request.query_hash"])
+        env["QUERY_STRING"] = Rack::Utils.build_query(query_hash)
 
         request_uri = env["PATH_INFO"]
         if env["QUERY_STRING"].any?
